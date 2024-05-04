@@ -8,6 +8,7 @@ source ./tests/commands/copy_object.sh
 source ./tests/commands/delete_object_tagging.sh
 source ./tests/commands/get_bucket_location.sh
 source ./tests/commands/get_bucket_tagging.sh
+source ./tests/commands/get_object.sh
 source ./tests/commands/list_buckets.sh
 source ./tests/commands/put_object.sh
 
@@ -96,6 +97,56 @@ test_common_put_object() {
 
   delete_bucket_or_contents "$1" "$BUCKET_ONE_NAME"
   delete_test_files "$2"
+}
+
+test_common_put_get_object() {
+  if [[ $# -ne 1 ]]; then
+    fail "put, get object test requires command type"
+  fi
+
+  local object_name="test-object"
+  create_test_files "$object_name" || local create_result=$?
+  [[ $create_result -eq 0 ]] || fail "Error creating test file"
+  echo "test data" > "$test_file_folder"/"$object_name"
+
+  setup_bucket "$1" "$BUCKET_ONE_NAME" || local setup_result=$?
+  [[ $setup_result -eq 0 ]] || fail "error setting up bucket"
+
+  put_object "$1" "$test_file_folder/$object_name" "$BUCKET_ONE_NAME" "$object_name" || local copy_result=$?
+  [[ $copy_result -eq 0 ]] || fail "Failed to add object to bucket"
+  object_exists "$1" "$BUCKET_ONE_NAME" "$object_name" || local exists_result_one=$?
+  [[ $exists_result_one -eq 0 ]] || fail "Object not added to bucket"
+
+  get_object "$1" "$BUCKET_ONE_NAME" "$object_name" "$test_file_folder/${object_name}_copy" || local delete_result=$?
+  [[ $delete_result -eq 0 ]] || fail "Failed to delete object"
+  object_exists "$1" "$BUCKET_ONE_NAME" "$object_name" || local exists_result_two=$?
+  [[ $exists_result_two -eq 1 ]] || fail "Object not removed from bucket"
+
+  compare_files "$test_file_folder"/"$object_name" "$test_file_folder/${object_name}_copy" || compare_result=$?
+  [[ $compare_result -ne 0 ]] || fail "objects are different"
+
+  delete_bucket_or_contents "$1" "$BUCKET_ONE_NAME"
+  delete_test_files "$test_file_folder/$object_name" "$test_file_folder/${object_name}_copy"
+}
+
+test_common_get_set_versioning() {
+  local object_name="test-object"
+  create_test_files "$object_name" || local create_result=$?
+  [[ $create_result -eq 0 ]] || fail "Error creating test file"
+
+  setup_bucket "$1" "$BUCKET_ONE_NAME" || local setup_result=$?
+  [[ $setup_result -eq 0 ]] || fail "error setting up bucket"
+
+  get_bucket_versioning "$1" "$BUCKET_ONE_NAME" || local get_result=$?
+  [[ $get_result -eq 0 ]] || fail "error getting bucket versioning"
+
+  put_bucket_versioning "$1" "$BUCKET_ONE_NAME" "Enabled" || local put_result=$?
+  [[ $put_result -eq 0 ]] || fail "error putting bucket versioning"
+
+  get_bucket_versioning "$1" "$BUCKET_ONE_NAME" || local get_result=$?
+  [[ $get_result -eq 0 ]] || fail "error getting bucket versioning"
+
+  fail "test fail"
 }
 
 # common test for listing buckets
