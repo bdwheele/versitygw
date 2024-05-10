@@ -31,6 +31,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/versity/versitygw/auth"
 	"github.com/versity/versitygw/backend"
+	"github.com/versity/versitygw/metrics"
 	"github.com/versity/versitygw/s3api/utils"
 	"github.com/versity/versitygw/s3err"
 	"github.com/versity/versitygw/s3event"
@@ -43,6 +44,7 @@ type S3ApiController struct {
 	iam      auth.IAMService
 	logger   s3log.AuditLogger
 	evSender s3event.S3EventSender
+	mm       *metrics.Manager
 	debug    bool
 	readonly bool
 }
@@ -51,7 +53,7 @@ const (
 	iso8601Format = "20060102T150405Z"
 )
 
-func New(be backend.Backend, iam auth.IAMService, logger s3log.AuditLogger, evs s3event.S3EventSender, debug bool, readonly bool) S3ApiController {
+func New(be backend.Backend, iam auth.IAMService, logger s3log.AuditLogger, evs s3event.S3EventSender, mm *metrics.Manager, debug bool, readonly bool) S3ApiController {
 	return S3ApiController{
 		be:       be,
 		iam:      iam,
@@ -59,6 +61,7 @@ func New(be backend.Backend, iam auth.IAMService, logger s3log.AuditLogger, evs 
 		evSender: evs,
 		debug:    debug,
 		readonly: readonly,
+		mm:       mm,
 	}
 }
 
@@ -67,8 +70,9 @@ func (c S3ApiController) ListBuckets(ctx *fiber.Ctx) error {
 	res, err := c.be.ListBuckets(ctx.Context(), acct.Access, acct.Role == "admin")
 	return SendXMLResponse(ctx, res, err,
 		&MetaOpts{
-			Logger: c.logger,
-			Action: "ListBucket",
+			Logger:     c.logger,
+			MetricsMng: c.mm,
+			Action:     "ListBucket",
 		})
 }
 
@@ -103,7 +107,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -113,7 +118,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -129,7 +135,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, res, nil,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObjectTagging",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObjectTagging",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -149,7 +156,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectRetention",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectRetention",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -159,7 +167,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, data, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectRetention",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectRetention",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -168,7 +177,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, retention, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObjectRetention",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObjectRetention",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -188,7 +198,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectLegalHold",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectLegalHold",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -197,7 +208,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, auth.ParseObjectLegalHoldOutput(data), err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObjectLegalHold",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObjectLegalHold",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -208,7 +220,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 				s3err.GetAPIError(s3err.ErrInvalidMaxParts),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "ListParts",
+					MetricsMng:  c.mm,
+					Action:      "s3:ListParts",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -223,7 +236,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidPartNumberMarker),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "ListParts",
+						MetricsMng:  c.mm,
+						Action:      "s3:ListParts",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -243,7 +257,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "ListParts",
+					MetricsMng:  c.mm,
+					Action:      "s3:ListParts",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -262,7 +277,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, res, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "ListParts",
+				MetricsMng:  c.mm,
+				Action:      "s3:ListParts",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -282,7 +298,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectAcl",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectAcl",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -293,7 +310,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, res, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObjectAcl",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObjectAcl",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -313,7 +331,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectAttributes",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectAttributes",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -324,7 +343,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectAttributes",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectAttributes",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -342,14 +362,16 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectAttributes",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectAttributes",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
 		return SendXMLResponse(ctx, utils.FilterObjectAttributes(attrs, res), err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObjectAttributes",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObjectAttributes",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -368,7 +390,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -384,7 +407,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -392,7 +416,8 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, fmt.Errorf("get object nil response"),
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -449,9 +474,11 @@ func (c S3ApiController) GetActions(ctx *fiber.Ctx) error {
 
 	return SendResponse(ctx, err,
 		&MetaOpts{
-			Logger:      c.logger,
-			Action:      "GetObject",
-			BucketOwner: parsedAcl.Owner,
+			Logger:        c.logger,
+			MetricsMng:    c.mm,
+			Action:        "s3:GetObject",
+			ContentLength: getint64(res.ContentLength),
+			BucketOwner:   parsedAcl.Owner,
 		})
 }
 
@@ -499,7 +526,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetBucketTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetBucketTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -509,7 +537,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetBucketTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetBucketTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -525,7 +554,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, resp, nil,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetBucketTagging",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetBucketTagging",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -544,7 +574,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetBucketVersioning",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetBucketVersioning",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -553,7 +584,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetBucketVersioning",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetBucketVersioning",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -562,7 +594,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, data, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetBucketVersioning",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetBucketVersioning",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -581,7 +614,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetBucketPolicy",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetBucketPolicy",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -590,7 +624,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, data, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetBucketPolicy",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetBucketPolicy",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -609,7 +644,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "ListObjectVersions",
+					MetricsMng:  c.mm,
+					Action:      "s3:ListObjectVersions",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -623,7 +659,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "ListObjectVersions",
+					MetricsMng:  c.mm,
+					Action:      "s3:ListObjectVersions",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -640,7 +677,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, data, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "ListObjectVersions",
+				MetricsMng:  c.mm,
+				Action:      "s3:ListObjectVersions",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -659,7 +697,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectLockConfiguration",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectLockConfiguration",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -669,7 +708,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetObjectLockConfiguration",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetObjectLockConfiguration",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -678,7 +718,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, resp, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetObjectLockConfiguration",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetObjectLockConfiguration",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -697,7 +738,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "GetBucketAcl",
+					MetricsMng:  c.mm,
+					Action:      "s3:GetBucketAcl",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -707,7 +749,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		if err != nil {
 			return SendResponse(ctx, err,
 				&MetaOpts{
-					Logger: c.logger,
+					Logger:     c.logger,
+					MetricsMng: c.mm,
 				})
 		}
 
@@ -715,7 +758,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, res, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "GetBucketAcl",
+				MetricsMng:  c.mm,
+				Action:      "s3:GetBucketAcl",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -734,7 +778,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "ListMultipartUploads",
+					MetricsMng:  c.mm,
+					Action:      "s3:ListMultipartUploads",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -746,7 +791,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			}
 			return SendXMLResponse(ctx, nil, err, &MetaOpts{
 				Logger:      c.logger,
-				Action:      "ListMultipartUploads",
+				MetricsMng:  c.mm,
+				Action:      "s3:ListMultipartUploads",
 				BucketOwner: parsedAcl.Owner,
 			})
 		}
@@ -762,7 +808,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, res, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "ListMultipartUploads",
+				MetricsMng:  c.mm,
+				Action:      "s3:ListMultipartUploads",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -781,7 +828,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "ListObjectsV2",
+					MetricsMng:  c.mm,
+					Action:      "s3:ListObjectsV2",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -794,7 +842,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "ListObjectsV2",
+					MetricsMng:  c.mm,
+					Action:      "s3:ListObjectsV2",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -810,7 +859,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, res, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "ListObjectsV2",
+				MetricsMng:  c.mm,
+				Action:      "s3:ListObjectsV2",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -828,7 +878,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, nil, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "ListObjects",
+				MetricsMng:  c.mm,
+				Action:      "s3:ListObjects",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -842,7 +893,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, nil, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "ListObjects",
+				MetricsMng:  c.mm,
+				Action:      "s3:ListObjects",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -861,7 +913,8 @@ func (c S3ApiController) ListActions(ctx *fiber.Ctx) error {
 	}{ListObjectsOutput: res}, err,
 		&MetaOpts{
 			Logger:      c.logger,
-			Action:      "ListObjects",
+			MetricsMng:  c.mm,
+			Action:      "s3:ListObjects",
 			BucketOwner: parsedAcl.Owner,
 		})
 }
@@ -891,7 +944,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -903,7 +957,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 				return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidTag),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutBucketTagging",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutBucketTagging",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -923,7 +978,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -932,7 +988,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutBucketTagging",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutBucketTagging",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -952,7 +1009,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketVersioning",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketVersioning",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -967,7 +1025,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketVersioning",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketVersioning",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -982,7 +1041,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutBucketVersioning",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutBucketVersioning",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1002,7 +1062,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutObjectLockConfiguration",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutObjectLockConfiguration",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1012,7 +1073,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutObjectLockConfiguration",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutObjectLockConfiguration",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1021,7 +1083,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutObjectLockConfiguration",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutObjectLockConfiguration",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1041,7 +1104,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketPolicy",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketPolicy",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1051,7 +1115,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketPolicy",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketPolicy",
 					BucketOwner: parsedAcl.Owner,
 				},
 			)
@@ -1061,7 +1126,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutBucketPolicy",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutBucketPolicy",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1087,7 +1153,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketAcl",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketAcl",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1100,7 +1167,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketAcl",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketAcl",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1115,7 +1183,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidRequest),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutBucketAcl",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutBucketAcl",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1138,7 +1207,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidRequest),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutBucketAcl",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutBucketAcl",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1151,7 +1221,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidRequest),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutBucketAcl",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutBucketAcl",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1184,7 +1255,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutBucketAcl",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutBucketAcl",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1193,7 +1265,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutBucketAcl",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutBucketAcl",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1201,8 +1274,9 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 	if ok := utils.IsValidBucketName(bucket); !ok {
 		return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidBucketName),
 			&MetaOpts{
-				Logger: c.logger,
-				Action: "CreateBucket",
+				Logger:     c.logger,
+				MetricsMng: c.mm,
+				Action:     "s3:CreateBucket",
 			})
 	}
 
@@ -1213,7 +1287,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutBucketAcl",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutBucketAcl",
 				BucketOwner: acct.Access,
 			})
 	}
@@ -1237,7 +1312,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "CreateBucket",
+				MetricsMng:  c.mm,
+				Action:      "s3:CreateBucket",
 				BucketOwner: acct.Access,
 			})
 	}
@@ -1254,7 +1330,8 @@ func (c S3ApiController) PutBucketActions(ctx *fiber.Ctx) error {
 	return SendResponse(ctx, err,
 		&MetaOpts{
 			Logger:      c.logger,
-			Action:      "CreateBucket",
+			MetricsMng:  c.mm,
+			Action:      "s3:CreateBucket",
 			BucketOwner: acct.Access,
 		})
 }
@@ -1313,7 +1390,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutObjectTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutObjectTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1329,7 +1407,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 				return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidTag),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutObjectTagging",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutObjectTagging",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1350,7 +1429,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutObjectTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutObjectTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1359,8 +1439,9 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
+				MetricsMng:  c.mm,
 				EvSender:    c.evSender,
-				Action:      "PutObjectTagging",
+				Action:      "s3:PutObjectTagging",
 				BucketOwner: parsedAcl.Owner,
 				EventName:   s3event.EventObjectTaggingPut,
 			})
@@ -1380,7 +1461,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutObjectRetention",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutObjectRetention",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1389,7 +1471,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		if err != nil {
 			return SendResponse(ctx, err, &MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutObjectRetention",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutObjectRetention",
 				BucketOwner: parsedAcl.Owner,
 			})
 		}
@@ -1397,7 +1480,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		err = c.be.PutObjectRetention(ctx.Context(), bucket, keyStart, versionId, retention)
 		return SendResponse(ctx, err, &MetaOpts{
 			Logger:      c.logger,
-			Action:      "PutObjectRetention",
+			MetricsMng:  c.mm,
+			Action:      "s3:PutObjectRetention",
 			BucketOwner: parsedAcl.Owner,
 		})
 	}
@@ -1407,7 +1491,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		if err := xml.Unmarshal(ctx.Body(), &legalHold); err != nil {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest), &MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutObjectLegalHold",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutObjectLegalHold",
 				BucketOwner: parsedAcl.Owner,
 			})
 		}
@@ -1425,7 +1510,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutObjectLegalHold",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutObjectLegalHold",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1433,7 +1519,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		err := c.be.PutObjectLegalHold(ctx.Context(), bucket, keyStart, versionId, legalHold.Status == types.ObjectLockLegalHoldStatusOn)
 		return SendResponse(ctx, err, &MetaOpts{
 			Logger:      c.logger,
-			Action:      "PutObjectLegalHold",
+			MetricsMng:  c.mm,
+			Action:      "s3:PutObjectLegalHold",
 			BucketOwner: parsedAcl.Owner,
 		})
 	}
@@ -1450,7 +1537,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 				s3err.GetAPIError(s3err.ErrInvalidPartNumber),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "UploadPartCopy",
+					MetricsMng:  c.mm,
+					Action:      "s3:UploadPartCopy",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1469,7 +1557,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "UploadPartCopy",
+					MetricsMng:  c.mm,
+					Action:      "s3:UploadPartCopy",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1487,7 +1576,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, resp, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "UploadPartCopy",
+				MetricsMng:  c.mm,
+				Action:      "s3:UploadPartCopy",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1502,7 +1592,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidPart),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "UploadPart",
+					MetricsMng:  c.mm,
+					Action:      "s3:UploadPart",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1522,7 +1613,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "UploadPart",
+					MetricsMng:  c.mm,
+					Action:      "s3:UploadPart",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1536,7 +1628,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "UploadPart",
+					MetricsMng:  c.mm,
+					Action:      "s3:UploadPart",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1562,9 +1655,11 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		ctx.Response().Header.Set("Etag", etag)
 		return SendResponse(ctx, err,
 			&MetaOpts{
-				Logger:      c.logger,
-				Action:      "UploadPart",
-				BucketOwner: parsedAcl.Owner,
+				Logger:        c.logger,
+				MetricsMng:    c.mm,
+				ContentLength: contentLength,
+				Action:        "s3:UploadPart",
+				BucketOwner:   parsedAcl.Owner,
 			})
 	}
 
@@ -1581,7 +1676,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidRequest),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutObjectAcl",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutObjectAcl",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1597,7 +1693,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidRequest),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutObjectAcl",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutObjectAcl",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1621,7 +1718,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidRequest),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutObjectAcl",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutObjectAcl",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1634,7 +1732,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidRequest),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "PutObjectAcl",
+						MetricsMng:  c.mm,
+						Action:      "s3:PutObjectAcl",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1668,8 +1767,9 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
+				MetricsMng:  c.mm,
 				EvSender:    c.evSender,
-				Action:      "PutObjectAcl",
+				Action:      "s3:PutObjectAcl",
 				BucketOwner: parsedAcl.Owner,
 				EventName:   s3event.EventObjectAclPut,
 			})
@@ -1690,7 +1790,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "CopyObject",
+					MetricsMng:  c.mm,
+					Action:      "s3:CopyObject",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1708,7 +1809,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidCopySource),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "CopyObject",
+						MetricsMng:  c.mm,
+						Action:      "s3:CopyObject",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1725,7 +1827,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 					s3err.GetAPIError(s3err.ErrInvalidCopySource),
 					&MetaOpts{
 						Logger:      c.logger,
-						Action:      "CopyObject",
+						MetricsMng:  c.mm,
+						Action:      "s3:CopyObject",
 						BucketOwner: parsedAcl.Owner,
 					})
 			}
@@ -1750,8 +1853,9 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, res.CopyObjectResult, err,
 				&MetaOpts{
 					Logger:      c.logger,
+					MetricsMng:  c.mm,
 					EvSender:    c.evSender,
-					Action:      "CopyObject",
+					Action:      "s3:CopyObject",
 					BucketOwner: parsedAcl.Owner,
 					ObjectETag:  res.CopyObjectResult.ETag,
 					VersionId:   res.VersionId,
@@ -1761,7 +1865,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, res, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "CopyObject",
+					MetricsMng:  c.mm,
+					Action:      "s3:CopyObject",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1784,7 +1889,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1794,7 +1900,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1808,7 +1915,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1821,7 +1929,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, s3err.GetAPIError(s3err.ErrObjectLockInvalidHeaders),
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1833,7 +1942,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutObject",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutObject",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1841,7 +1951,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrPastObjectLockRetainDate),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "PutObject",
+					MetricsMng:  c.mm,
+					Action:      "s3:PutObject",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1854,7 +1965,8 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "PutObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:PutObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1883,13 +1995,15 @@ func (c S3ApiController) PutActions(ctx *fiber.Ctx) error {
 	ctx.Response().Header.Set("ETag", etag)
 	return SendResponse(ctx, err,
 		&MetaOpts{
-			Logger:      c.logger,
-			EvSender:    c.evSender,
-			Action:      "PutObject",
-			BucketOwner: parsedAcl.Owner,
-			ObjectETag:  &etag,
-			ObjectSize:  contentLength,
-			EventName:   s3event.EventObjectCreatedPut,
+			Logger:        c.logger,
+			MetricsMng:    c.mm,
+			ContentLength: contentLength,
+			EvSender:      c.evSender,
+			Action:        "s3:PutObject",
+			BucketOwner:   parsedAcl.Owner,
+			ObjectETag:    &etag,
+			ObjectSize:    contentLength,
+			EventName:     s3event.EventObjectCreatedPut,
 		})
 }
 
@@ -1914,7 +2028,8 @@ func (c S3ApiController) DeleteBucket(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "DeleteBucketTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:DeleteBucketTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1923,7 +2038,8 @@ func (c S3ApiController) DeleteBucket(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "DeleteBucketTagging",
+				MetricsMng:  c.mm,
+				Action:      "s3:DeleteBucketTagging",
 				BucketOwner: parsedAcl.Owner,
 				Status:      http.StatusNoContent,
 			})
@@ -1944,7 +2060,8 @@ func (c S3ApiController) DeleteBucket(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "DeleteBucketPolicy",
+					MetricsMng:  c.mm,
+					Action:      "s3:DeleteBucketPolicy",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -1953,7 +2070,8 @@ func (c S3ApiController) DeleteBucket(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "DeleteBucketPolicy",
+				MetricsMng:  c.mm,
+				Action:      "s3:DeleteBucketPolicy",
 				BucketOwner: parsedAcl.Owner,
 				Status:      http.StatusNoContent,
 			})
@@ -1973,7 +2091,8 @@ func (c S3ApiController) DeleteBucket(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "DeleteBucket",
+				MetricsMng:  c.mm,
+				Action:      "s3:DeleteBucket",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -1985,7 +2104,8 @@ func (c S3ApiController) DeleteBucket(ctx *fiber.Ctx) error {
 	return SendResponse(ctx, err,
 		&MetaOpts{
 			Logger:      c.logger,
-			Action:      "DeleteBucket",
+			MetricsMng:  c.mm,
+			Action:      "s3:DeleteBucket",
 			BucketOwner: parsedAcl.Owner,
 			Status:      http.StatusNoContent,
 		})
@@ -2006,7 +2126,8 @@ func (c S3ApiController) DeleteObjects(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidRequest),
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "DeleteObjects",
+				MetricsMng:  c.mm,
+				Action:      "s3:DeleteObjects",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2025,7 +2146,8 @@ func (c S3ApiController) DeleteObjects(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "DeleteObjects",
+				MetricsMng:  c.mm,
+				Action:      "s3:DeleteObjects",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2035,7 +2157,8 @@ func (c S3ApiController) DeleteObjects(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "DeleteObjects",
+				MetricsMng:  c.mm,
+				Action:      "s3:DeleteObjects",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2050,7 +2173,9 @@ func (c S3ApiController) DeleteObjects(ctx *fiber.Ctx) error {
 	return SendXMLResponse(ctx, res, err,
 		&MetaOpts{
 			Logger:      c.logger,
-			Action:      "DeleteObjects",
+			MetricsMng:  c.mm,
+			Action:      "s3:DeleteObjects",
+			ObjectCount: int64(len(dObj.Objects)),
 			BucketOwner: parsedAcl.Owner,
 			EvSender:    c.evSender,
 			EventName:   s3event.EventObjectRemovedDeleteObjects,
@@ -2087,7 +2212,8 @@ func (c S3ApiController) DeleteActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "DeleteObjectTagging",
+					MetricsMng:  c.mm,
+					Action:      "s3:DeleteObjectTagging",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2097,8 +2223,9 @@ func (c S3ApiController) DeleteActions(ctx *fiber.Ctx) error {
 			&MetaOpts{
 				Status:      http.StatusNoContent,
 				Logger:      c.logger,
+				MetricsMng:  c.mm,
 				EvSender:    c.evSender,
-				Action:      "DeleteObjectTagging",
+				Action:      "s3:DeleteObjectTagging",
 				BucketOwner: parsedAcl.Owner,
 				EventName:   s3event.EventObjectTaggingDelete,
 			})
@@ -2123,7 +2250,8 @@ func (c S3ApiController) DeleteActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "AbortMultipartUpload",
+					MetricsMng:  c.mm,
+					Action:      "s3:AbortMultipartUpload",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2139,7 +2267,8 @@ func (c S3ApiController) DeleteActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "AbortMultipartUpload",
+				MetricsMng:  c.mm,
+				Action:      "s3:AbortMultipartUpload",
 				BucketOwner: parsedAcl.Owner,
 				Status:      http.StatusNoContent,
 			})
@@ -2160,7 +2289,8 @@ func (c S3ApiController) DeleteActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "DeleteObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:DeleteObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2170,7 +2300,8 @@ func (c S3ApiController) DeleteActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "DeleteObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:DeleteObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2184,8 +2315,9 @@ func (c S3ApiController) DeleteActions(ctx *fiber.Ctx) error {
 	return SendResponse(ctx, err,
 		&MetaOpts{
 			Logger:      c.logger,
+			MetricsMng:  c.mm,
 			EvSender:    c.evSender,
-			Action:      "DeleteObject",
+			Action:      "s3:DeleteObject",
 			BucketOwner: parsedAcl.Owner,
 			EventName:   s3event.EventObjectRemovedDelete,
 			Status:      http.StatusNoContent,
@@ -2213,7 +2345,8 @@ func (c S3ApiController) HeadBucket(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "HeadBucket",
+				MetricsMng:  c.mm,
+				Action:      "s3:HeadBucket",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2236,7 +2369,8 @@ func (c S3ApiController) HeadBucket(ctx *fiber.Ctx) error {
 	return SendResponse(ctx, err,
 		&MetaOpts{
 			Logger:      c.logger,
-			Action:      "HeadBucket",
+			MetricsMng:  c.mm,
+			Action:      "s3:HeadBucket",
 			BucketOwner: parsedAcl.Owner,
 		})
 }
@@ -2266,7 +2400,8 @@ func (c S3ApiController) HeadObject(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, s3err.GetAPIError(s3err.ErrInvalidPartNumber),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "HeadObject",
+					MetricsMng:  c.mm,
+					Action:      "s3:HeadObject",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2289,7 +2424,8 @@ func (c S3ApiController) HeadObject(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "HeadObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:HeadObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2304,7 +2440,8 @@ func (c S3ApiController) HeadObject(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "HeadObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:HeadObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2312,7 +2449,8 @@ func (c S3ApiController) HeadObject(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, fmt.Errorf("head object nil response"),
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "HeadObject",
+				MetricsMng:  c.mm,
+				Action:      "s3:HeadObject",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2385,7 +2523,8 @@ func (c S3ApiController) HeadObject(ctx *fiber.Ctx) error {
 	return SendResponse(ctx, nil,
 		&MetaOpts{
 			Logger:      c.logger,
-			Action:      "HeadObject",
+			MetricsMng:  c.mm,
+			Action:      "s3:HeadObject",
 			BucketOwner: parsedAcl.Owner,
 		})
 }
@@ -2418,7 +2557,8 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "RestoreObject",
+					MetricsMng:  c.mm,
+					Action:      "s3:RestoreObject",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2438,7 +2578,8 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 			return SendResponse(ctx, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "RestoreObject",
+					MetricsMng:  c.mm,
+					Action:      "s3:RestoreObject",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2450,8 +2591,9 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 		return SendResponse(ctx, err,
 			&MetaOpts{
 				Logger:      c.logger,
+				MetricsMng:  c.mm,
 				EvSender:    c.evSender,
-				Action:      "RestoreObject",
+				Action:      "s3:RestoreObject",
 				BucketOwner: parsedAcl.Owner,
 				EventName:   s3event.EventObjectRestoreCompleted,
 			})
@@ -2469,7 +2611,8 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 				s3err.GetAPIError(s3err.ErrMalformedXML),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "SelectObjectContent",
+					MetricsMng:  c.mm,
+					Action:      "s3:SelectObjectContent",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2489,7 +2632,8 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "SelectObjectContent",
+					MetricsMng:  c.mm,
+					Action:      "s3:SelectObjectContent",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2525,7 +2669,8 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 				s3err.GetAPIError(s3err.ErrMalformedXML),
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "CompleteMultipartUpload",
+					MetricsMng:  c.mm,
+					Action:      "s3:CompleteMultipartUpload",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2545,7 +2690,8 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, nil, err,
 				&MetaOpts{
 					Logger:      c.logger,
-					Action:      "CompleteMultipartUpload",
+					MetricsMng:  c.mm,
+					Action:      "s3:CompleteMultipartUpload",
 					BucketOwner: parsedAcl.Owner,
 				})
 		}
@@ -2563,8 +2709,9 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 			return SendXMLResponse(ctx, res, err,
 				&MetaOpts{
 					Logger:      c.logger,
+					MetricsMng:  c.mm,
 					EvSender:    c.evSender,
-					Action:      "CompleteMultipartUpload",
+					Action:      "s3:CompleteMultipartUpload",
 					BucketOwner: parsedAcl.Owner,
 					ObjectETag:  res.ETag,
 					EventName:   s3event.EventCompleteMultipartUpload,
@@ -2574,7 +2721,8 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, res, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "CompleteMultipartUpload",
+				MetricsMng:  c.mm,
+				Action:      "s3:CompleteMultipartUpload",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2594,7 +2742,8 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 		return SendXMLResponse(ctx, nil, err,
 			&MetaOpts{
 				Logger:      c.logger,
-				Action:      "CreateMultipartUpload",
+				MetricsMng:  c.mm,
+				Action:      "s3:CreateMultipartUpload",
 				BucketOwner: parsedAcl.Owner,
 			})
 	}
@@ -2607,21 +2756,25 @@ func (c S3ApiController) CreateActions(ctx *fiber.Ctx) error {
 	return SendXMLResponse(ctx, res, err,
 		&MetaOpts{
 			Logger:      c.logger,
-			Action:      "CreateMultipartUpload",
+			MetricsMng:  c.mm,
+			Action:      "s3:CreateMultipartUpload",
 			BucketOwner: parsedAcl.Owner,
 		})
 }
 
 type MetaOpts struct {
-	Logger      s3log.AuditLogger
-	EvSender    s3event.S3EventSender
-	Action      string
-	BucketOwner string
-	ObjectSize  int64
-	EventName   s3event.EventType
-	ObjectETag  *string
-	VersionId   *string
-	Status      int
+	Logger        s3log.AuditLogger
+	EvSender      s3event.S3EventSender
+	MetricsMng    *metrics.Manager
+	ContentLength int64
+	Action        string
+	BucketOwner   string
+	ObjectSize    int64
+	ObjectCount   int64
+	EventName     s3event.EventType
+	ObjectETag    *string
+	VersionId     *string
+	Status        int
 }
 
 func SendResponse(ctx *fiber.Ctx, err error, l *MetaOpts) error {
@@ -2631,6 +2784,9 @@ func SendResponse(ctx *fiber.Ctx, err error, l *MetaOpts) error {
 			BucketOwner: l.BucketOwner,
 			ObjectSize:  l.ObjectSize,
 		})
+	}
+	if l.MetricsMng != nil {
+		l.MetricsMng.Send(err, l.Action, l.ContentLength, l.ObjectCount)
 	}
 	if err != nil {
 		var apierr s3err.APIError
@@ -2674,6 +2830,9 @@ const (
 )
 
 func SendXMLResponse(ctx *fiber.Ctx, resp any, err error, l *MetaOpts) error {
+	if l.MetricsMng != nil {
+		l.MetricsMng.Send(err, l.Action, l.ContentLength, l.ObjectCount)
+	}
 	if err != nil {
 		if l.Logger != nil {
 			l.Logger.Log(ctx, err, nil, s3log.LogMeta{
