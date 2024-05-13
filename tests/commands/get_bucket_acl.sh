@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 
 get_bucket_acl() {
-  if [ $# -ne 1 ]; then
-    echo "bucket ACL command missing bucket name"
+  if [ $# -ne 2 ]; then
+    echo "bucket ACL command missing command type, bucket name"
     return 1
   fi
   local exit_code=0
-  acl=$(aws --no-verify-ssl s3api get-bucket-acl --bucket "$1" 2>&1) || exit_code="$?"
+  if [[ $1 == 'aws' ]]; then
+    acl=$(aws --no-verify-ssl s3api get-bucket-acl --bucket "$2" 2>&1) || exit_code="$?"
+  elif [[ $1 == 's3cmd' ]]; then
+    acl=$(s3cmd "${S3CMD_OPTS[@]}" --no-check-certificate info "s3://$2" 2>&1) || exit_code="$?"
+  fi
   if [ $exit_code -ne 0 ]; then
     echo "Error getting bucket ACLs: $acl"
     return 1
