@@ -2,7 +2,7 @@
 
 put_bucket_policy() {
   if [[ $# -ne 3 ]]; then
-    echo "get bucket policy command requires command type, bucket, policy file"
+    log 2 "get bucket policy command requires command type, bucket, policy file"
     return 1
   fi
   if [[ $1 == 'aws' ]] || [[ $1 == 's3api' ]]; then
@@ -12,11 +12,11 @@ put_bucket_policy() {
   elif [[ $1 == 'mc' ]]; then
     policy=$(mc --insecure anonymous set-json "$3" "$MC_ALIAS/$2" 2>&1) || put_result=$?
   else
-    echo "command 'put bucket policy' not implemented for '$1'"
+    log 2 "command 'put bucket policy' not implemented for '$1'"
     return 1
   fi
   if [[ $put_result -ne 0 ]]; then
-    echo "error putting policy: $policy"
+    log 2 "error putting policy: $policy"
     return 1
   fi
   return 0

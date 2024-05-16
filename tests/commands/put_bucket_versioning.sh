@@ -2,7 +2,7 @@
 
 put_bucket_versioning() {
   if [[ $# -ne 3 ]]; then
-    echo "put bucket versioning command requires command type, bucket name, 'Enabled' or 'Suspended'"
+    log 2 "put bucket versioning command requires command type, bucket name, 'Enabled' or 'Suspended'"
     return 1
   fi
   local put_result=0
@@ -10,7 +10,7 @@ put_bucket_versioning() {
     error=$(aws --no-verify-ssl s3api put-bucket-versioning --bucket "$2" --versioning-configuration "{ \"Status\": \"$3\"}" 2>&1) || put_result=$?
   fi
   if [[ $put_result -ne 0 ]]; then
-    echo "error putting bucket versioning: $error"
+    log 2 "error putting bucket versioning: $error"
     return 1
   fi
   return 0

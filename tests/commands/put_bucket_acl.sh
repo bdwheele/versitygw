@@ -8,7 +8,7 @@ put_bucket_acl() {
   local error=""
   local put_result=0
   if [[ $1 == 's3api' ]]; then
-    log 5 "$2 $3"
+    log 5 "bucket name: $2, acls: $3"
     error=$(aws --no-verify-ssl s3api put-bucket-acl --bucket "$2" --access-control-policy "file://$3" 2>&1) || put_result=$?
   elif [[ $1 == 's3cmd' ]]; then
     error=$(s3cmd "${S3CMD_OPTS[@]}" --no-check-certificate setacl "s3://$2" --acl-grant=read:ABCDEFG 2>&1) || put_result=$?

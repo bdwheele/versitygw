@@ -2,7 +2,7 @@
 
 get_bucket_versioning() {
   if [[ $# -ne 2 ]]; then
-    echo "put bucket versioning command requires command type, bucket name"
+    log 2 "put bucket versioning command requires command type, bucket name"
     return 1
   fi
   local get_result=0
@@ -10,9 +10,8 @@ get_bucket_versioning() {
     error=$(aws --no-verify-ssl s3api get-bucket-versioning --bucket "$2" 2>&1) || get_result=$?
   fi
   if [[ $get_result -ne 0 ]]; then
-    echo "error getting bucket versioning: $error"
+    log 2 "error getting bucket versioning: $error"
     return 1
   fi
-  echo $error
   return 0
 }

@@ -2,7 +2,7 @@
 
 get_bucket_acl() {
   if [ $# -ne 2 ]; then
-    echo "bucket ACL command missing command type, bucket name"
+    log 2 "bucket ACL command missing command type, bucket name"
     return 1
   fi
   local exit_code=0
@@ -15,7 +15,7 @@ get_bucket_acl() {
     return 1
   fi
   if [ $exit_code -ne 0 ]; then
-    echo "Error getting bucket ACLs: $acl"
+    log 2 "Error getting bucket ACLs: $acl"
     return 1
   fi
   export acl
