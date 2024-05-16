@@ -8,8 +8,8 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v4
 
-      - name: Install ShellCheck
-        run: sudo apt-get install shellcheck
+      - name: Install ShellCheck and md5
+        run: sudo apt-get install shellcheck md5sum
 
       - name: Run ShellCheck
         run: shellcheck -S warning ./tests/*.sh
