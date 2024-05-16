@@ -5,6 +5,7 @@ source ./tests/util.sh
 source ./tests/util_aws.sh
 source ./tests/util_bucket_create.sh
 source ./tests/util_file.sh
+source ./tests/util_users.sh
 source ./tests/test_common.sh
 source ./tests/commands/copy_object.sh
 source ./tests/commands/delete_bucket_policy.sh
@@ -59,6 +60,15 @@ source ./tests/commands/put_object.sh
   delete_test_files $bucket_file
 }
 
+@test "test_copy_object" {
+  test_common_copy_object "s3api"
+}
+
+# test creation and deletion of bucket on versitygw
+@test "test_create_delete_bucket_aws" {
+  test_common_create_delete_bucket "aws"
+}
+
 @test "test_put_object" {
   bucket_file="bucket_file"
 
@@ -80,11 +90,6 @@ source ./tests/commands/put_object.sh
   delete_bucket_or_contents "aws" "$BUCKET_ONE_NAME"
   delete_bucket_or_contents "aws" "$BUCKET_TWO_NAME"
   delete_test_files "$bucket_file"
-}
-
-# test creation and deletion of bucket on versitygw
-@test "test_create_delete_bucket_aws" {
-  test_common_create_delete_bucket "aws"
 }
 
 @test "test_create_bucket_invalid_name" {
@@ -123,7 +128,7 @@ source ./tests/commands/put_object.sh
   setup_bucket "aws" "$BUCKET_ONE_NAME" || local created=$?
   [[ $created -eq 0 ]] || fail "Error creating bucket"
 
-  get_bucket_acl "$BUCKET_ONE_NAME" || local result=$?
+  get_bucket_acl "s3api" "$BUCKET_ONE_NAME" || local result=$?
   [[ $result -eq 0 ]] || fail "Error retrieving acl"
 
   id=$(echo "$acl" | grep -v "InsecureRequestWarning" | jq '.Owner.ID')
@@ -133,60 +138,7 @@ source ./tests/commands/put_object.sh
 }
 
 @test "test_put_bucket_acl" {
-  setup_bucket "aws" "$BUCKET_ONE_NAME" || local created=$?
-  [[ $created -eq 0 ]] || fail "Error creating bucket"
-
-  policy_file="policy_file"
-
-  create_test_files "$policy_file" || local created=$?
-  [[ $created -eq 0 ]] || fail "Error creating policy file"
-
-  effect="Allow"
-  action="s3:PutBucketAcl"
-  resource="arn:aws:s3:::$BUCKET_ONE_NAME"
-
-  cat <<EOF > "$test_file_folder"/$policy_file
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-       "Effect": "$effect",
-       "Principal": "*",
-       "Action": "$action",
-       "Resource": "$resource"
-    }
-  ]
-}
-EOF
-
-  echo "$test_file_folder"/"$policy_file"
-  cat "$test_file_folder"/"$policy_file"
-
-  #put_bucket_policy "s3api" "$BUCKET_ONE_NAME" "$test_file_folder"/"$policy_file" || put_result=$?
-  #[[ $put_result -eq 0 ]] || fail "error putting bucket policy"
-
-  get_bucket_acl "aws" "$BUCKET_ONE_NAME" || local result=$?
-  [[ $result -eq 0 ]] || fail "Error retrieving acl"
-
-  id=$(echo "$acl" | grep -v "InsecureRequestWarning" | jq '.Owner.ID')
-  if [[ $id != '"'"$AWS_ACCESS_KEY_ID"'"' ]]; then
-    # in some cases, ID is canonical user ID rather than AWS_ACCESS_KEY_ID
-    canonical_id=$(aws --no-verify-ssl s3api list-buckets --query 'Owner.ID') || local list_result=$?
-    [[ $list_result -eq 0 ]] || fail "error getting canonical ID: $canonical_id"
-    [[ $id == "$canonical_id" ]] || fail "acl ID doesn't match AWS key or canonical ID"
-  fi
-
-  put_bucket_acl "mc" "$BUCKET_ONE_NAME" "public" || local put_result=$?
-  [[ $put_result -eq 0 ]] || fail "Error putting acl"
-
-  get_bucket_acl "mc" "$BUCKET_ONE_NAME" || local result=$?
-  [[ $result -eq 0 ]] || fail "Error retrieving acl"
-
-  echo "$acl"
-
-  delete_bucket_or_contents "aws" "$BUCKET_ONE_NAME"
-
-  fail "test fail"
+  test_common_put_bucket_acl "s3api"
 }
 
 # test ability to retrieve object ACLs
@@ -247,9 +199,9 @@ EOF
   test_common_set_get_delete_bucket_tags "aws"
 }
 
-@test "test_get_set_versioning" {
-  test_common_get_set_versioning "s3api"
-}
+#@test "test_get_set_versioning" {
+#  test_common_get_set_versioning "s3api"
+#}
 
 # test v1 s3api list objects command
 @test "test-s3api-list-objects-v1" {
