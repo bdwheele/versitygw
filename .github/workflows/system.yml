@@ -9,7 +9,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install ShellCheck and md5
-        run: sudo apt-get install shellcheck md5sum
+        run: sudo apt-get install shellcheck coreutils
 
       - name: Run ShellCheck
         run: shellcheck -S warning ./tests/*.sh
